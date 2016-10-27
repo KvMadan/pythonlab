@@ -36,8 +36,8 @@ loopControl = commands.getoutput('cat ~/keepAlive')
 
 while not (loopControl == "false"):
 
-    QueueSize = commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b testload all -j |jq .ep_queue_size')
-    TodoSize = commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b testload all -j |jq .ep_flusher_todo')
+    QueueSize = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b testload all -j |jq .ep_queue_size'))
+    TodoSize = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b testload all -j |jq .ep_flusher_todo'))
     diskDrain = int(QueueSize) + int(TodoSize)
 
     flushFail = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b testload all -j |jq .ep_item_flush_failed'))
@@ -46,8 +46,10 @@ while not (loopControl == "false"):
     memUsed = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 all -b testload -j |jq .mem_used'))
 
     # Add other REST stats
-    opsPer = commands.getoutput("curl -s -u Administrator:password http://" + str(thisNode) + ":8091/pools/default/buckets/testload/stats |jq .op.samples.ops")
-    nodeHealth = (str(commands.getoutput("curl -s -u Administrator:password http://" + str(thisNode) + ":8091/pools/default |jq .nodes[" + str(i) + "].hostname")) + str(commands.getoutput("curl -s -u Administrator:password http://" + seedNode + ":8091/pools/default |jq .nodes[" + str(i) + "].status")))
+    opsPer = int(commands.getoutput("curl -s -u Administrator:password http://" + str(thisNode) + ":8091/pools/default/buckets/testload/stats |jq .op.samples.ops[0]"))
+    #opsPer = opsStat.split("\"")[0]
+    healthStat = str((commands.getoutput("curl -s -u Administrator:password http://" + str(seedNode) + ":8091/pools/default |jq .nodes[" + str(i) + "].status")))
+    nodeHealth = healthStat.split("\"")[1]
 
     # Drain Queue via REST API
     # diskDrain = commands.getoutput("curl -s -u Administrator:password http://" + seedNode + ":8091/pools/default/buckets/testload/stats |jq .op.samples.ep_diskqueue_drain[59]")
