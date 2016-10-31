@@ -3,6 +3,8 @@ import pytz
 import commands
 import time
 import requests
+import json
+import statistics
 
 from couchbase.bucket import Bucket
 
@@ -12,11 +14,15 @@ binPath = "/Applications/couchbase-server-enterprise_4/Couchbase\ Server.app/Con
 # binPath = "/opt/couchbase/bin"
 
 # This is the cluster we'll use to collect statistics
+# TODO: Add command line arg for seedNode
 seedNode = "192.168.61.101"
+seedBucket = "testload"
+
 # This is the cluster we're monitoring.
-# We'll use the localhost to determine which node in the cluster this script is running.
+# Determine which node in the cluster this script is running.
 # clusterNode = "localhost"
 clusterNode = "192.168.61.101"
+clusterBucket = "test"
 
 # Iterate across cluster for the node I'm on
 numNodes = int(commands.getoutput("curl -s -u Administrator:password http://" + clusterNode + ":8091/pools/default |jq '.nodes | length'"))
@@ -28,37 +34,34 @@ for i in range(0,numNodes-1):
         thisNode = thisNode.split("@")[1]
         thisNode = thisNode.split("\"")[0]
         #print ("this node" + str(thisNode))
+        healthStat = str((commands.getoutput("curl -s -u Administrator:password http://" + str(thisNode) + ":8091/pools/default |jq .nodes[" + str(i) + "].status")))
+        nodeHealth = healthStat.split("\"")[1]
 
-cb = Bucket('couchbase://' + seedNode + '/testload?operation_timeout=30')
+cb = Bucket('couchbase://' + seedNode + '/' + seedBucket + '?operation_timeout=30')
 print (thisNode)
 
 loopControl = commands.getoutput('cat ~/keepAlive')
 
 while not (loopControl == "false"):
 
-    QueueSize = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b testload all -j |jq .ep_queue_size'))
-    TodoSize = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b testload all -j |jq .ep_flusher_todo'))
+    QueueSize = round(float((commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b ' + str(clusterBucket) + ' all -j |jq .ep_queue_size'))),0)
+    TodoSize = round(float((commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b ' + clusterBucket + ' all -j |jq .ep_flusher_todo'))),0)
     diskDrain = int(QueueSize) + int(TodoSize)
 
-    flushFail = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b testload all -j |jq .ep_item_flush_failed'))
-    tempOOM = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 memory -b testload -j |jq .ep_tmp_oom_errors'))
-    cacheMiss = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 all -b testload -j |jq .ep_bg_fetched'))
-    memUsed = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 all -b testload -j |jq .mem_used'))
+    flushFail = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b ' + clusterBucket + ' all -j |jq .ep_item_flush_failed'))
+    tempOOM = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b ' + clusterBucket + ' memory -j |jq .ep_tmp_oom_errors'))
+    cacheMiss = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b ' + clusterBucket + ' all -j |jq .ep_bg_fetched'))
+    memUsed = int(commands.getoutput(binPath + '/cbstats ' + str(thisNode) + ':11210 -b ' + clusterBucket + ' all -j |jq .mem_used'))
 
-    # Add other REST stats
-    opsPer = int(commands.getoutput("curl -s -u Administrator:password http://" + str(thisNode) + ":8091/pools/default/buckets/testload/stats |jq .op.samples.ops[0]"))
-    #opsPer = opsStat.split("\"")[0]
-    healthStat = str((commands.getoutput("curl -s -u Administrator:password http://" + str(seedNode) + ":8091/pools/default |jq .nodes[" + str(i) + "].status")))
-    nodeHealth = healthStat.split("\"")[1]
-
-    # Drain Queue via REST API
     # diskDrain = commands.getoutput("curl -s -u Administrator:password http://" + seedNode + ":8091/pools/default/buckets/testload/stats |jq .op.samples.ep_diskqueue_drain[59]")
-    resp = requests.get('http://' + str(thisNode) + ':8091/pools/default/buckets/testload/stats')
+    # Drain Queue via REST API
+    resp = requests.get('http://Administrator:password@' + str(thisNode) + ':8091/pools/default/buckets/' + clusterBucket + '/stats')
     if resp.status_code != 200:
         # This means something went wrong.
         print("oh crap" + resp.status_code)
-    for theItems in resp.json():
-        print("output" + str(theItems))
+    a = json.loads(resp.text)
+    diskDrain = int((json.dumps(a['op']['samples']['ep_diskqueue_drain'][0], indent=4, separators=(',', ': '))))
+    opsPer = int((json.dumps(a['op']['samples']['ops'][0], indent=4, separators=(',', ': '))))
 
     #nowStamp = datetime.datetime.now(tz=pytz.UTC)
     nowStamp = datetime.datetime.now(tz=pytz.UTC).strftime('%Y-%m-%dT%H:%M:%S.%f')
@@ -73,6 +76,7 @@ while not (loopControl == "false"):
         'operations': opsPer,
         'nodes': nodeHealth
     }
+    print(json.dumps(json_str, indent=4, separators=(',', ': ')))
 
     cb.upsert(str(thisNode) + "::" + nowStamp, json_str, ttl=2505600)
 
