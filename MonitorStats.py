@@ -27,15 +27,18 @@ clusterBucket = "test"
 # Iterate across cluster for the node I'm on
 numNodes = int(commands.getoutput("curl -s -u Administrator:password http://" + clusterNode + ":8091/pools/default |jq '.nodes | length'"))
 for i in range(0,numNodes-1):
-    ctr = (str(commands.getoutput("curl -s -u Administrator:password http://" + clusterNode + ":8091/pools/default |jq .nodes[" + str(i) + "].thisNode")))
-    #print (ctr)
+    rtn = requests.get('http://Administrator:password@' + clusterNode + ':8091/pools/default')
+    if rtn.status_code != 200:
+        # This means something went wrong.
+        print("oh crap " + rtn.status_code)
+    z = json.loads(rtn.text)
+    ctr = str((json.dumps(z['nodes'][i]['thisNode'])))
+    #ctr = (str(commands.getoutput("curl -s -u Administrator:password http://" + clusterNode + ":8091/pools/default |jq .nodes[" + str(i) + "].thisNode")))
     if ctr == "true":
         thisNode = (str(commands.getoutput("curl -s -u Administrator:password http://" + clusterNode + ":8091/pools/default |jq .nodes[" + str(i) + "].otpNode")))
         thisNode = thisNode.split("@")[1]
         thisNode = thisNode.split("\"")[0]
         #print ("this node" + str(thisNode))
-        healthStat = str((commands.getoutput("curl -s -u Administrator:password http://" + str(thisNode) + ":8091/pools/default |jq .nodes[" + str(i) + "].status")))
-        nodeHealth = healthStat.split("\"")[1]
 
 cb = Bucket('couchbase://' + seedNode + '/' + seedBucket + '?operation_timeout=30')
 print (thisNode)
@@ -58,12 +61,13 @@ while not (loopControl == "false"):
     resp = requests.get('http://Administrator:password@' + str(thisNode) + ':8091/pools/default/buckets/' + clusterBucket + '/stats')
     if resp.status_code != 200:
         # This means something went wrong.
-        print("oh crap" + resp.status_code)
+        print("oh crap " + resp.status_code)
     a = json.loads(resp.text)
-    diskDrain = int((json.dumps(a['op']['samples']['ep_diskqueue_drain'][0], indent=4, separators=(',', ': '))))
-    opsPer = int((json.dumps(a['op']['samples']['ops'][0], indent=4, separators=(',', ': '))))
+    diskDrain = int(json.dumps(a['op']['samples']['ep_diskqueue_drain'][0], indent=4, separators=(',', ': ')))
+    opsPer = int(json.dumps(a['op']['samples']['ops'][0], indent=4, separators=(',', ': ')))
+    healthStat = str(commands.getoutput("curl -s -u Administrator:password http://" + str(thisNode) + ":8091/pools/default |jq .nodes[" + str(i) + "].status"))
+    nodeHealth = healthStat.split("\"")[1]
 
-    #nowStamp = datetime.datetime.now(tz=pytz.UTC)
     nowStamp = datetime.datetime.now(tz=pytz.UTC).strftime('%Y-%m-%dT%H:%M:%S.%f')
 
     json_str = {
