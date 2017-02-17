@@ -20,7 +20,7 @@ for result in View(cb, "beer", "allkeys"):
     start = time.time()
     resp = requests.post('http://10.112.151.101:4984/beers/', data=json.dumps(payload), headers=headers)
     end = time.time()
-    avg_track.extend([end - start])
+    avg_track.extend([end - start] * 1000)
     #time.sleep(2)
     i = i + 1
 
@@ -38,7 +38,7 @@ for result in View(cb2, "beer", "allkeys"):
     start = time.time()
     resp = requests.get('http://10.112.151.101:4984/beers/', data=json.dumps(jsonID), headers=headers)
     end = time.time()
-    avg_track.extend([end - start])
+    avg_track.extend([end - start] * 1000)
     #time.sleep(2)
     i = i + 1
 
