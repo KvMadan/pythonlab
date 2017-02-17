@@ -4,6 +4,7 @@ import time
 from couchbase.bucket import Bucket
 import requests
 from couchbase.views.iterator import View
+from collections import Counter
 
 cb = Bucket('couchbase://10.112.151.101/beer-sample?operation_timeout=30')
 cb2 = Bucket('couchbase://10.112.151.101/beers?operation_timeout=30')
@@ -25,9 +26,13 @@ for result in View(cb, "beer", "allkeys"):
     i = i + 1
 
 avg_value = sum(avg_track)/len(avg_track)
-print(avg_track)
+#print(avg_track)
 print("average POST ... ")
 print (avg_value)
+modedata = Counter(avg_track)
+#print (modedata.most_common())   # Returns all unique items and their counts
+print (modedata.most_common(1))  # Returns the highest occurring item
+
 i = 0
 start = 0
 end = 0
@@ -43,8 +48,11 @@ for result in View(cb2, "beer", "allkeys"):
     i = i + 1
 
 avg_value = sum(avg_track)/len(avg_track)
-print(avg_track)
+#print(avg_track)
 print("average GET ...")
 print(avg_value)
+modedata = Counter(avg_track)
+#print(modedata.most_common())   # Returns all unique items and their counts
+print(modedata.most_common(1))  # Returns the highest occurring item
 
 cb.closed
