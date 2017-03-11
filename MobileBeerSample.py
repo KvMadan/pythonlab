@@ -23,7 +23,7 @@ for result in View(cb, "beer", "allkeys"):
     payload = cb.get(jsonID).value
     jsonKey = ("SG::" + str(i))
     start = time.time()
-    resp = requests.post('http://10.112.151.101:4984/beers/', data=json.dumps(payload), headers=headers)
+    resp = requests.post('http://{}:4984/beers/'.format(CBS), data=json.dumps(payload), headers=headers)
     end = time.time()
     avg_track.extend([(end - start) * 1000])
     #time.sleep(2)
