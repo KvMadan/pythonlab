@@ -12,7 +12,6 @@ SG="10.112.151.101"
 CBG="10.112.151.1"
 cb = Bucket('couchbase://10.112.151.101/beer-sample?operation_timeout=30')
 cb2 = Bucket('couchbase://10.112.151.101/beers?operation_timeout=30')
-thecert = "CBcert.ca"
 
 i = 0
 start = 0
@@ -67,7 +66,7 @@ for result in View(cb2, "beer", "allkeys"):
     jsonID = result.docid
     theStatement = "statement=SELECT%20*%20from%20%60beer-sample%60%20USE%20KEYS%20%22" + jsonID + "%22"
     start = time.time()
-    resp = requests.get('https://{}:18093/query?'.format(SG), data=theStatement, headers=headers, cert=thecert)
+    resp = requests.get('https://{}:18093/query?'.format(SG), data=theStatement, headers=headers, verify='/Users/justin/Documents/Demo/pythonlab/CBcert.ca')
     end = time.time()
     avg_track.extend([(end - start) * 1000])
     #time.sleep(2)
